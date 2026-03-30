@@ -32,6 +32,7 @@ class ViewController: NSViewController {
     @IBOutlet weak var closeApps: NSButton!
     var checkKey = NSMenuItem(title: "Disable all shortcuts", action: #selector(switchKey), keyEquivalent: "")
     
+    let systemAppsToExclude = ["Finder", "Activity Monitor", "System Preferences", "System Settings", "App Store"]
     
     var timer = Timer()
     var timerCount = Timer()
@@ -179,7 +180,7 @@ class ViewController: NSViewController {
     func checkAnyWindows() {
         var totalSessions = 0
         for runningApplication in NSWorkspace.shared.runningApplications {
-            if ((ignoreFinder.state == .on && (runningApplication.localizedName != "Finder" && runningApplication.localizedName != "Activity Monitor" && runningApplication.localizedName != "System Preferences" && runningApplication.localizedName != "App Store")) || ignoreFinder.state == .off) {
+            if ((ignoreFinder.state == .on && !systemAppsToExclude.contains(runningApplication.localizedName ?? "")) || ignoreFinder.state == .off) {
                 if (runningApplication.activationPolicy == .regular) {
                     totalSessions += 1
                 }
@@ -459,7 +460,7 @@ class ViewController: NSViewController {
         for runningApplication in NSWorkspace.shared.runningApplications {
             
             // Check if the application is in the exception list
-            if ((ignoreFinder.state == .on && (runningApplication.localizedName != "Finder" && runningApplication.localizedName != "Activity Monitor" && runningApplication.localizedName != "System Preferences" && runningApplication.localizedName != "App Store")) || ignoreFinder.state == .off) {
+            if ((ignoreFinder.state == .on && !systemAppsToExclude.contains(runningApplication.localizedName ?? "")) || ignoreFinder.state == .off) {
                 
                 // Ignore itself + only affect regular applications
                 if (runningApplication.activationPolicy == .regular && runningApplication.localizedName != "Later" && runningApplication != runningApp) {
@@ -492,7 +493,7 @@ class ViewController: NSViewController {
             }
         }
         
-        if ((ignoreFinder.state == .on && (runningApp.localizedName != "Finder" && runningApp.localizedName != "Activity Monitor" && runningApp.localizedName != "System Preferences" && runningApp.localizedName != "App Store")) || ignoreFinder.state == .off) {
+        if ((ignoreFinder.state == .on && !systemAppsToExclude.contains(runningApp.localizedName ?? "")) || ignoreFinder.state == .off) {
             if (runningApp.activationPolicy == .regular && runningApp.localizedName != "Later") {
                 array.append(runningApp.executableURL!.absoluteString)
                 arrayNames.append(runningApp.localizedName!)
@@ -548,12 +549,8 @@ class ViewController: NSViewController {
         guard let app = NSWorkspace.shared.runningApplications.filter ({
             return $0.localizedName == name
         }).first else {
-            do {
-                let task = Process()
-                task.executableURL = URL.init(string:url)
-                try task.run()
-            } catch {
-                print("Error")
+            if let appURL = URL(string: url) {
+                NSWorkspace.shared.open(appURL)
             }
             return
         }
@@ -566,7 +563,7 @@ class ViewController: NSViewController {
         // Check if apps are to be terminated as opposed to hiding them
         if (closeApps.state == .on) {
             for runningApplication in NSWorkspace.shared.runningApplications {
-                if ((ignoreFinder.state == .on && (runningApplication.localizedName != "Finder" && runningApplication.localizedName != "Activity Monitor" && runningApplication.localizedName != "System Preferences" && runningApplication.localizedName != "App Store")) || ignoreFinder.state == .off) {
+                if ((ignoreFinder.state == .on && !systemAppsToExclude.contains(runningApplication.localizedName ?? "")) || ignoreFinder.state == .off) {
                     if (runningApplication.activationPolicy == .regular && runningApplication.localizedName != "Terminal") {
                         runningApplication.terminate()
                     }
