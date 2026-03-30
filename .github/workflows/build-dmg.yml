@@ -1,0 +1,49 @@
+name: Build DMG
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Later.app
+        run: |
+          xcodebuild \
+            -project xcode/Later.xcodeproj \
+            -target Test \
+            -configuration Release \
+            -derivedDataPath /tmp/DerivedData \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            SYMROOT=/tmp/build \
+            build
+
+      - name: Create DMG
+        run: |
+          APP_PATH="/tmp/build/Release/Later.app"
+          DMG_DIR="/tmp/dmg_staging"
+          DMG_OUT="Later.dmg"
+
+          mkdir -p "$DMG_DIR"
+          cp -r "$APP_PATH" "$DMG_DIR/"
+          ln -s /Applications "$DMG_DIR/Applications"
+
+          hdiutil create \
+            -srcfolder "$DMG_DIR" \
+            -volname "Later" \
+            -format UDZO \
+            -o "$DMG_OUT"
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Later.dmg
+          path: Later.dmg
