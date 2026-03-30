@@ -1,4 +1,4 @@
-name: Build DMG (macOS 26.4 Optimized)
+name: Build DMG (Auto-Scheme Detection)
 
 on:
   push:
@@ -6,28 +6,35 @@ on:
   workflow_dispatch:
 
 env:
-  # 强制使用较新的 Node 版本以避免 GitHub Actions 警告
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
-    # 使用最新的 macOS 环境（通常包含最新版 Xcode）
     runs-on: macos-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive # 如果项目有子模块，确保一并拉取
+          submodules: recursive
 
-      - name: Build Later.app
+      - name: Detect Scheme and Build
         run: |
-          # 创建编译输出目录
-          mkdir -p build_output
+          # 1. 自动获取项目中的第一个有效 Scheme 名
+          # 使用 xcodebuild -list 命令并解析输出
+          SCHEME_NAME=$(xcodebuild -list -project xcode/Later.xcodeproj | awk '/Schemes:/{flag=1;next} flag{print $1;exit}' | tr -d '[:space:]')
           
+          if [ -z "$SCHEME_NAME" ]; then
+            echo "错误: 在 xcode/Later.xcodeproj 中找不到任何 Scheme！"
+            exit 1
+          fi
+          
+          echo "检测到 Scheme: $SCHEME_NAME，开始编译..."
+
+          # 2. 执行编译
           xcodebuild \
             -project xcode/Later.xcodeproj \
-            -scheme Test \
+            -scheme "$SCHEME_NAME" \
             -configuration Release \
             -derivedDataPath ./DerivedData \
             -destination "platform=macOS" \
@@ -40,32 +47,32 @@ jobs:
 
       - name: Create DMG
         run: |
-          # 动态定位编译好的 .app 路径（防止路径写死导致找不到文件）
-          APP_PATH=$(find ./DerivedData -name "Later.app" -type d | head -n 1)
+          # 动态寻找编译出的 .app 文件
+          APP_PATH=$(find ./DerivedData -name "*.app" -type d | head -n 1)
           
           if [ -z "$APP_PATH" ]; then
-            echo "错误: 未能找到编译生成的 Later.app"
+            echo "错误: 未能在 DerivedData 中找到编译生成的 .app"
             exit 1
           fi
           
-          echo "找到路径: $APP_PATH"
+          APP_NAME=$(basename "$APP_PATH")
+          echo "正在为 $APP_NAME 打包..."
           
           DMG_DIR="dmg_staging"
-          DMG_OUT="Later_M4_Universal.dmg"
+          DMG_OUT="Later_Universal.dmg"
 
           mkdir -p "$DMG_DIR"
           cp -r "$APP_PATH" "$DMG_DIR/"
-          # 创建 Applications 软链接，方便用户安装
           ln -s /Applications "$DMG_DIR/Applications"
 
           hdiutil create \
             -srcfolder "$DMG_DIR" \
-            -volname "Later Launchpad" \
+            -volname "Later Installer" \
             -format UDZO \
             -o "$DMG_OUT"
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Later-Installer
+          name: Later-App-Installer
           path: "*.dmg"
